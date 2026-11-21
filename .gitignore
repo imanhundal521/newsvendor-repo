@@ -1,0 +1,19 @@
+# python cache
+__pycache__/
+*.pyc
+
+# virtual environments
+venv/
+.venv/
+env/
+
+# jupyter
+.ipynb_checkpoints/
+
+# streamlit secrets (don't commit these)
+.streamlit/secrets.toml
+
+# editor / mac stuff
+.vscode/
+.idea/
+.DS_Store
