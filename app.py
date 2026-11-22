@@ -16,15 +16,23 @@ salvage = st.sidebar.number_input("Salvage value (leftover trees)", min_value=0.
 Q = st.sidebar.number_input("Trees to order (Q)", min_value=0, value=100, step=1)
 
 st.sidebar.header("Tree demand")
-dist = st.sidebar.selectbox("Distribution", ["Normal", "Uniform"])
+dist = st.sidebar.selectbox("Distribution", ["Normal", "Uniform", "Poisson", "Triangular"])
 if dist == "Normal":
     mean = st.sidebar.number_input("Mean", value=100.0)
     sd = st.sidebar.number_input("Standard deviation", min_value=0.0, value=25.0)
     params = {"mean": mean, "sd": sd}
-else:
+elif dist == "Uniform":
     low = st.sidebar.number_input("Low", min_value=0.0, value=50.0)
     high = st.sidebar.number_input("High", min_value=0.0, value=150.0)
     params = {"low": low, "high": high}
+elif dist == "Poisson":
+    mean = st.sidebar.number_input("Mean", min_value=0.1, value=100.0)
+    params = {"mean": mean}
+elif dist == "Triangular":
+    low = st.sidebar.number_input("Low", min_value=0.0, value=50.0)
+    mode = st.sidebar.number_input("Most likely (mode)", min_value=0.0, value=90.0)
+    high = st.sidebar.number_input("High", min_value=0.0, value=150.0)
+    params = {"low": low, "mode": mode, "high": high}
 
 st.sidebar.header("Simulation")
 n_reps = st.sidebar.number_input("Number of replications", min_value=100, value=5000, step=500)
@@ -38,6 +46,14 @@ if salvage >= cost:
 if dist == "Uniform" and high <= low:
     st.warning("High needs to be bigger than Low.")
     st.stop()
+
+if dist == "Triangular":
+    if not (low <= mode <= high):
+        st.warning("For Triangular, the numbers need to go Low ≤ Mode ≤ High.")
+        st.stop()
+    if low == high:
+        st.warning("Low and High can't be the same number.")
+        st.stop()
 
 # ---- run the simulation ----
 rng = np.random.default_rng(int(seed))
@@ -58,6 +74,13 @@ st.write(f"Probability of running out of trees (demand > Q): **{stockout_prob:.1
 st.subheader("Critical fractile")
 st.write(f"Critical fractile Cu / (Cu + Co): **{cf:.1%}**")
 st.write(f"Implied number of trees to order: **{best_q:.1f}** (you picked {Q})")
+
+st.subheader("Simulated tree demand")
+st.caption("This is the demand distribution you picked, with your Q as the red line.")
+demand_fig = px.histogram(x=demand, nbins=40, labels={"x": "Trees demanded"})
+demand_fig.add_vline(x=Q, line_color="red", line_dash="dash")
+demand_fig.update_layout(yaxis_title="Count", height=300)
+st.plotly_chart(demand_fig)
 
 st.subheader("Profit histogram")
 fig = px.histogram(x=profits, nbins=50, labels={"x": "Profit"})
