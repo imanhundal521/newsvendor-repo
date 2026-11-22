@@ -1,5 +1,7 @@
 import numpy as np
+import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 import sim
@@ -60,7 +62,7 @@ rng = np.random.default_rng(int(seed))
 demand = sim.sample_demand(dist, params, int(n_reps), rng)
 profits = sim.profit(Q, demand, price, cost, salvage)
 
-expected_profit = profits.mean()
+expected_profit, ci_low, ci_high = sim.confidence_interval(profits)
 stockout_prob = (demand > Q).mean()
 
 cf = sim.critical_fractile(price, cost, salvage)
@@ -68,8 +70,36 @@ best_q = sim.implied_q(dist, params, cf)
 
 # ---- results ----
 st.subheader("Results")
-st.write(f"Estimated expected profit: **${expected_profit:,.2f}**")
+st.write(f"Estimated expected profit: **${expected_profit:,.2f}** "
+         f"(95% CI: ${ci_low:,.2f} to ${ci_high:,.2f})")
+st.caption("The 95% confidence interval is the range the true expected profit most likely falls in. "
+           "If you ran this simulation over and over, about 95% of intervals built this way would contain it. "
+           "More replications = narrower interval.")
 st.write(f"Probability of running out of trees (demand > Q): **{stockout_prob:.1%}**")
+
+# show how the interval shrinks as replications go up
+with st.expander("How the confidence interval narrows with more replications"):
+    rep_counts = sorted(set([500, 1000, 2500, 5000, 10000, 25000, 50000, int(n_reps)]))
+    rows = sim.ci_by_replications(dist, params, Q, price, cost, salvage, rep_counts, int(seed))
+    ci_table = pd.DataFrame(rows)
+
+    ci_fig = go.Figure()
+    ci_fig.add_trace(go.Scatter(
+        x=ci_table["replications"], y=ci_table["mean"], mode="markers",
+        error_y=dict(type="data", array=ci_table["half_width"]),
+        name="Expected profit ± 95% CI"))
+    # highlight the number of replications the user picked
+    current = ci_table[ci_table["replications"] == int(n_reps)]
+    ci_fig.add_trace(go.Scatter(
+        x=current["replications"], y=current["mean"], mode="markers",
+        marker=dict(size=14, color="red"), name="Your replications"))
+    ci_fig.update_layout(xaxis_type="log", xaxis_title="Number of replications (log scale)",
+                         yaxis_title="Expected profit", height=350)
+    st.plotly_chart(ci_fig)
+
+    st.caption("The width shrinks with 1/√n, so 4x the replications cuts the interval roughly in half.")
+    st.dataframe(ci_table[["replications", "mean", "low", "high", "half_width"]].round(2),
+                 hide_index=True)
 
 st.subheader("Critical fractile")
 st.write(f"Critical fractile Cu / (Cu + Co): **{cf:.1%}**")
@@ -92,16 +122,27 @@ st.subheader("Find the optimal Q")
 st.caption("Expected profit for a range of order quantities, all using the same simulated demand.")
 
 q_values = sim.q_range(demand)
-curve = sim.expected_profit_curve(q_values, demand, price, cost, salvage)
-sim_best_q = q_values[curve.argmax()]
-sim_best_profit = curve.max()
+curve, curve_low, curve_high = sim.expected_profit_curve(q_values, demand, price, cost, salvage)
+best_index = curve.argmax()
+sim_best_q = q_values[best_index]
+sim_best_profit = curve[best_index]
 
 st.write(f"Best Q from the simulation: **{sim_best_q}** trees, "
-         f"expected profit **${sim_best_profit:,.2f}**")
+         f"expected profit **${sim_best_profit:,.2f}** "
+         f"(95% CI: ${curve_low[best_index]:,.2f} to ${curve_high[best_index]:,.2f})")
 
-q_fig = px.line(x=q_values, y=curve, labels={"x": "Trees ordered (Q)", "y": "Expected profit"})
-q_fig.add_scatter(x=[sim_best_q], y=[sim_best_profit], mode="markers",
-                  marker=dict(size=12, color="green"), name="Best Q (simulated)")
+q_fig = go.Figure()
+# shaded 95% CI band: draw the upper edge, then fill down to the lower edge
+q_fig.add_trace(go.Scatter(x=q_values, y=curve_high, mode="lines", line=dict(width=0),
+                           showlegend=False, hoverinfo="skip"))
+q_fig.add_trace(go.Scatter(x=q_values, y=curve_low, mode="lines", line=dict(width=0),
+                           fill="tonexty", fillcolor="rgba(99, 110, 250, 0.2)",
+                           name="95% CI"))
+q_fig.add_trace(go.Scatter(x=q_values, y=curve, mode="lines", name="Expected profit",
+                           line=dict(color="rgb(99, 110, 250)")))
+q_fig.add_trace(go.Scatter(x=[sim_best_q], y=[sim_best_profit], mode="markers",
+                           marker=dict(size=12, color="green"), name="Best Q (simulated)"))
 q_fig.add_vline(x=best_q, line_color="red", line_dash="dash",
                 annotation_text="Critical fractile Q")
+q_fig.update_layout(xaxis_title="Trees ordered (Q)", yaxis_title="Expected profit")
 st.plotly_chart(q_fig)

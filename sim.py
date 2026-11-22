@@ -40,13 +40,39 @@ def q_range(demand, max_points=500):
     return np.arange(0, top + 1, step)
 
 
+def confidence_interval(values, z=1.96):
+    # 95% CI for the mean: mean +/- 1.96 * (sample std / sqrt(n))
+    mean = np.mean(values)
+    half_width = z * np.std(values, ddof=1) / np.sqrt(len(values))
+    return mean, mean - half_width, mean + half_width
+
+
 def expected_profit_curve(q_values, demand, price, cost, salvage):
     # use the SAME demand sample for every Q (common random numbers)
     # so differences between Qs come from Q itself and not from sampling noise
-    results = []
+    # returns the mean profit at each Q plus the low/high ends of the 95% CI
+    means, lows, highs = [], [], []
     for q in q_values:
-        results.append(profit(q, demand, price, cost, salvage).mean())
-    return np.array(results)
+        mean, low, high = confidence_interval(profit(q, demand, price, cost, salvage))
+        means.append(mean)
+        lows.append(low)
+        highs.append(high)
+    return np.array(means), np.array(lows), np.array(highs)
+
+
+def ci_by_replications(dist, params, Q, price, cost, salvage, rep_counts, seed):
+    # draw one big sample and use the first n values for each n,
+    # so the only thing changing between rows is how many replications we use
+    rng = np.random.default_rng(seed)
+    demand = sample_demand(dist, params, max(rep_counts), rng)
+    profits = profit(Q, demand, price, cost, salvage)
+
+    rows = []
+    for n in rep_counts:
+        mean, low, high = confidence_interval(profits[:n])
+        rows.append({"replications": n, "mean": mean, "low": low, "high": high,
+                     "half_width": high - mean})
+    return rows
 
 
 def critical_fractile(price, cost, salvage):
