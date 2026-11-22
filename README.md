@@ -4,7 +4,7 @@ Streamlit app for the newsvendor problem, but with christmas trees. A tree lot h
 
 The app simulates a bunch of random demand scenarios (5000 by default) and shows the expected profit, the chance of running out of trees, and a histogram of profits. It also shows the critical fractile and the order quantity it suggests so you can compare it to what you picked.
 
-Demand can be normal or uniform.
+Demand can be normal, uniform, poisson or triangular. There's also a small chart of the simulated demand so you can see what the distribution you picked looks like.
 
 To run it:
 
