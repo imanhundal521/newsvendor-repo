@@ -32,6 +32,23 @@ def profit(Q, demand, price, cost, salvage):
     return price * sold + salvage * leftover - cost * Q
 
 
+def q_range(demand, max_points=500):
+    # go from 0 up to a bit past the high end of demand (99.5th percentile)
+    top = int(np.ceil(1.1 * np.percentile(demand, 99.5)))
+    # if demand is really big, skip some Qs so this doesn't take forever
+    step = max(1, top // max_points)
+    return np.arange(0, top + 1, step)
+
+
+def expected_profit_curve(q_values, demand, price, cost, salvage):
+    # use the SAME demand sample for every Q (common random numbers)
+    # so differences between Qs come from Q itself and not from sampling noise
+    results = []
+    for q in q_values:
+        results.append(profit(q, demand, price, cost, salvage).mean())
+    return np.array(results)
+
+
 def critical_fractile(price, cost, salvage):
     cu = price - cost    # underage cost - profit lost on each missed sale
     co = cost - salvage  # overage cost - money lost on each unsold unit
