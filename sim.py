@@ -32,6 +32,30 @@ def profit(Q, demand, price, cost, salvage):
     return price * sold + salvage * leftover - cost * Q
 
 
+def risk_stats(Q, demand, profits):
+    # a few numbers that describe what can happen at a single Q
+    sold = np.minimum(Q, demand)
+    leftover = np.maximum(Q - demand, 0)
+    lost_sales = np.maximum(demand - Q, 0)
+
+    # fill rate = share of total demand we actually covered
+    if demand.sum() > 0:
+        fill_rate = sold.sum() / demand.sum()
+    else:
+        fill_rate = 1.0
+
+    return {
+        "avg_sold": sold.mean(),
+        "avg_leftover": leftover.mean(),
+        "avg_lost_sales": lost_sales.mean(),
+        "fill_rate": fill_rate,
+        "stockout_prob": (demand > Q).mean(),
+        "profit_p5": np.percentile(profits, 5),
+        "profit_p95": np.percentile(profits, 95),
+        "prob_loss": (profits < 0).mean(),
+    }
+
+
 def q_range(demand, max_points=500):
     # go from 0 up to a bit past the high end of demand (99.5th percentile)
     top = int(np.ceil(1.1 * np.percentile(demand, 99.5)))
