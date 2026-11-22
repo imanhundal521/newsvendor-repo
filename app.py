@@ -86,3 +86,22 @@ st.subheader("Profit histogram")
 fig = px.histogram(x=profits, nbins=50, labels={"x": "Profit"})
 fig.update_layout(yaxis_title="Count")
 st.plotly_chart(fig)
+
+# ---- find the optimal Q ----
+st.subheader("Find the optimal Q")
+st.caption("Expected profit for a range of order quantities, all using the same simulated demand.")
+
+q_values = sim.q_range(demand)
+curve = sim.expected_profit_curve(q_values, demand, price, cost, salvage)
+sim_best_q = q_values[curve.argmax()]
+sim_best_profit = curve.max()
+
+st.write(f"Best Q from the simulation: **{sim_best_q}** trees, "
+         f"expected profit **${sim_best_profit:,.2f}**")
+
+q_fig = px.line(x=q_values, y=curve, labels={"x": "Trees ordered (Q)", "y": "Expected profit"})
+q_fig.add_scatter(x=[sim_best_q], y=[sim_best_profit], mode="markers",
+                  marker=dict(size=12, color="green"), name="Best Q (simulated)")
+q_fig.add_vline(x=best_q, line_color="red", line_dash="dash",
+                annotation_text="Critical fractile Q")
+st.plotly_chart(q_fig)
